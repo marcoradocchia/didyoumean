@@ -11,6 +11,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use reqwest::get;
 use std::{
     cmp::min,
+    fmt::Write as _,
     fs::{create_dir, read_dir, read_to_string, remove_file, File},
     io::{self, BufRead, Error, Write},
 };
@@ -153,11 +154,13 @@ fn run_app() -> std::result::Result<(), Error> {
 
         // Add numbers if not clean.
         if !args.clean_output {
-            output.push_str(&format!(
+            write!(
+                output,
                 "{:>indent$}{} ",
                 (i + 1).to_string().purple(),
                 ".".purple()
-            ));
+            )
+            .unwrap();
         }
 
         // Add words in order of edit distance.
@@ -165,7 +168,7 @@ fn run_app() -> std::result::Result<(), Error> {
 
         // Add edit distance if verbose.
         if args.verbose {
-            output.push_str(&format!(" (edit distance: {})", top_n_dists[i]));
+            write!(output, " (edit distance: {})", top_n_dists[i]).unwrap();
         }
 
         // Print concatenated string.

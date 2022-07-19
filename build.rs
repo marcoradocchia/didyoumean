@@ -3,7 +3,7 @@ use clap_complete::{
     generate_to,
     Shell::{Bash, Elvish, Fish, PowerShell, Zsh},
 };
-use clap_mangen;
+use clap_mangen::Man;
 
 // Include the Cli struct.
 include!("src/cli.rs");
@@ -23,7 +23,7 @@ fn main() {
     cmd.set_bin_name("dym");
 
     // Generate man page.
-    let man = clap_mangen::Man::new(cmd.to_owned());
+    let man = Man::new(cmd.to_owned());
     let mut buffer: Vec<u8> = Default::default();
     man.render(&mut buffer).expect("Man page generation failed");
     std::fs::write(man_dir.join("dym.1"), buffer).expect("Failed to write man page");
