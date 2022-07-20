@@ -2,7 +2,7 @@ pub mod cli;
 pub mod langs;
 pub mod lib;
 
-use clap::Parser;
+use clap::{Command, Parser};
 use colored::*;
 use dialoguer::{theme::ColorfulTheme, Select};
 use dirs::data_dir;
@@ -64,38 +64,31 @@ fn run_app() -> std::result::Result<(), Error> {
         std::process::exit(0);
     }
 
-    let mut search_term = String::new();
-
-    // Check if nothing was passed in as the search term.
-    if args.search_term == None {
+    // Unwrap Option<String> or check if something was piped in as the search term.
+    let search_term = args.search_term.unwrap_or_else(|| {
         // Check if stdin is empty, produce error if so.
         if atty::is(atty::Stream::Stdin) {
-            let mut cmd = clap::Command::new("dym [OPTIONS] <SEARCH_TERM>");
-            let error = cmd.error(
-                clap::ErrorKind::MissingRequiredArgument,
-                format!(
-                    "The {} argument was not provided.\n\n\tEither provide it as an argument or pass it in from standard input.",
-                    "<SEARCH_TERM>".green()
+            Command::new("dym [OPTIONS] <SEARCH_TERM>")
+                .error(
+                    clap::ErrorKind::MissingRequiredArgument,
+                    format!(
+                        "The {} argument was not provided.\n\n\tEither provide it as an argument or pass it in from standard input.",
+                        "<SEARCH_TERM>".green()
+                    )
                 )
-            );
-            clap::Error::exit(&error);
+                .exit();
         } else {
             // Read search_term from standard input if stdin is not empty.
-            let stdin = io::stdin();
-            stdin.lock().read_line(&mut search_term).unwrap();
+            let mut search_term = String::new();
+            io::stdin().lock().read_line(&mut search_term).unwrap();
+            search_term
         }
-    } else {
-        // Unwrap Option<String> that was read from the client.
-        search_term = args.search_term.unwrap();
-    }
+    });
 
     if SUPPORTED_LANGS.contains_key(args.lang.as_str()) {
         fetch_word_list(args.lang.to_owned());
     } else {
-        // Not supported
-        // Initialize new command.
-        let mut cmd = clap::Command::new("dym [OPTIONS] <SEARCH_TERM>");
-
+        // Not supported.
         // Whether or not locale code is valid.
         let error_string = if LOCALES.contains_key(args.lang.as_str()) {
             format!(
@@ -106,11 +99,10 @@ fn run_app() -> std::result::Result<(), Error> {
             format!("{} is not a recognized localed code", args.lang)
         };
 
-        // Set error.
-        let error = cmd.error(clap::ErrorKind::MissingRequiredArgument, error_string);
-
         // Exit with error.
-        clap::Error::exit(&error);
+        Command::new("dym [OPTIONS] <SEARCH_TERM>")
+            .error(clap::ErrorKind::MissingRequiredArgument, error_string)
+            .exit();
     }
 
     // Get word list. The program will only get here if/when this is a valid word list.
@@ -125,7 +117,7 @@ fn run_app() -> std::result::Result<(), Error> {
     let mut top_n_dists = vec![search_term.len() * 10; args.number];
 
     // Loop over the words in the dictionary, run the algorithm, and
-    // add to the list if appropriate
+    // add to the list if appropriate.
     let search_chars = search_term.chars().collect::<Vec<_>>();
     for word in dictionary {
         // Get edit distance.
@@ -149,7 +141,7 @@ fn run_app() -> std::result::Result<(), Error> {
     }
     let mut items = vec!["".to_string(); args.number];
     for i in 0..args.number {
-        let mut output: String = "".to_string();
+        let mut output = String::new();
         let indent = args.number.to_string().len();
 
         // Add numbers if not clean.
@@ -177,22 +169,14 @@ fn run_app() -> std::result::Result<(), Error> {
 
     // If the yank argument is set, copy the item to the clipboard.
     if args.yank {
-        // Print prompt
-        println!(
-            "{} {}",
-            "?".yellow(),
-            "[↑↓ to move, ↵ to select, esc/q to cancel]".bold()
-        );
-        // Get the chosen argument.
+        // Get the chosen argument with prompt.
         let chosen = Select::with_theme(&ColorfulTheme::default())
+            .with_prompt("[↑↓ to move, ↵ to select, esc/q to cancel]")
             .items(&items)
             .default(0)
+            .report(false)
+            .clear(false)
             .interact_opt()?;
-
-        // Print out items since dialoguer clears.
-        for item in items {
-            println!("  {}", item);
-        }
 
         match chosen {
             // If the chosen arguemnt is valid.
